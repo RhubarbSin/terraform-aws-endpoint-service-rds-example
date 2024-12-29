@@ -1,0 +1,52 @@
+#+title: terraform-aws-endpoint-service-rds-example
+* Overview
+  This Terraform configuration provides an example of using AWS PrivateLink to provide access from an EC2 instance to an RDS instance in a different VPC via an endpoint connected to an endpoint service that uses a Network Load Balancer to forward traffic to the RDS instance. It creates the following resources:
+  - Two VPCs
+  - An RDS instance in one VPC (the "Provider VPC") and an EC2 instance in the other VPC (the "Consumer VPC")
+  - A Network Load Balancer in the Provider VPC with a TCP listener on port 10000 forwarding to a target group that uses the RDS instance as a target
+  - A VPC endpoint service in the Provider VPC using the Network Load Balancer
+  - A VPC interface endpoint in the Consumer VPC with a connection to the endpoint service in the Provider VPC
+  - A private hosted zone in Route 53 associated with the Consumer VPC
+  - A DNS CNAME record in the private hosted zone to provide a friendly name for connecting to the VPC endpoint
+* Prerequisites
+  - Git
+  - Terraform
+* Suggested Method of Deployment and Usage
+  If an environment providing the prerequisites is not readily available, AWS CloudShell can be used for deployment. Terraform can be installed on Amazon Linux 2023 in CloudShell with the following command:
+  #+begin_src shell
+  curl https://gist.githubusercontent.com/RhubarbSin/d3db401da906015ff2a88cca1a42b027/raw/ddf6ecbadbbf7304a97d7b5657216af99c8bff49/install-terraform-amazon-linux-2023.sh | bash
+  #+end_src
+  After deployment, the following commands can be used to demonstrate connectivity from the EC2 instance to the RDS instance by using the =mariadb=, the MariaDB command-line tool:
+  - Use SSH to connect to the public IP address of the EC2 instance and check the status of the RDS instance via the VPC endpoint:
+    #+begin_src shell
+    ssh -o StrictHostKeyChecking=no \
+        -i $(terraform output -raw ssh_key_file_name) \
+        ec2-user@$(terraform output -raw instance_public_ip) \
+        mariadb --host=$(terraform output -raw vpc_endpoint_dns_cname_record) \
+                --user=$(terraform output -raw rds_username) \
+                --password=$(terraform output -raw rds_password) \
+                --port=10000 --execute=status
+    #+end_src
+  The =host=, =user=, =password=, and =port= arguments are included above for completeness but can be omitted because they are configured in the =~/.my.cnf= file for the /ec2-user/ account.
+  - Execute arbitrary statements on the RDS instance:
+    #+begin_src shell
+    ssh -o StrictHostKeyChecking=no \
+        -i $(terraform output -raw ssh_key_file_name) \
+        ec2-user@$(terraform output -raw instance_public_ip) \
+        mariadb --execute=\'select Host, User from mysql.user\\G\'
+    #+end_src
+  - Run the MariaDB command-line tool interactively:
+    1. Log into the EC2 instance:
+       #+begin_src shell
+       ssh -o StrictHostKeyChecking=no \
+           -i $(terraform output -raw ssh_key_file_name) \
+           ec2-user@$(terraform output -raw instance_public_ip)
+       #+end_src
+    2. Execute =mariadb=.
+* Configuration
+  By default, resources are provisioned in the us-east-2 region. The region used is specified by the value of the /region/ input variable.
+* Notes
+  Equivalent functionality can be implemented by using a VPC resource endpoint and a VPC Lattice service network, at the expense of more extensive configuration but with the benefit of much greater flexibility for more complicated use cases.
+* Diagram
+  [[./terraform-aws-endpoint-service-rds-example.png]]
+

@@ -1,0 +1,11 @@
+*
+!.gitignore
+!LICENSE
+!*/
+!*.tf
+!*.org
+!*.sh
+!*.tftpl
+!*.yaml
+!*.drawio
+!*.png
